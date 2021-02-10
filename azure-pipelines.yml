@@ -1,13 +1,46 @@
 
 trigger:
-- master
+  batch: true
+  branches:
+    include:
+      - master
 
-pool:
-  vmImage: 'vs2017-win2016'
+pr:
+  - master
 
-steps:
-- task: katalonTask@0
-  displayName: 'Execute Katalon Studio project'
-  inputs:
-    version: '7.0.1'
-    executeArgs: '-browserType="Chrome" -retry=0 -statusDelay=15 -testSuitePath="Test Suites/TS_RegressionTest"'
+stages:
+  - stage: Test
+    jobs:
+      - job: Test
+        pool:
+          vmImage: 'ubuntu-latest'
+
+        steps:
+
+          - checkout: self
+            fetchDepth: 1
+            clean: true
+
+          - bash: |
+              npm install
+              npm test
+            displayName: Test
+          - task: DockerInstaller@0
+            displayName: Docker Installer
+            inputs:
+              dockerVersion: 18.09.9
+              releaseType: stable
+
+          - bash: |
+              set -ex
+              export REPORT_PATH=$(pwd)/report
+              docker run -t --rm -v \
+                $REPORT_PATH: \
+                -e PASSWORD=e0e98d25-cf12-4571-963e-172e7b74a861  \
+                -e PROJECT_ID=111176 \
+                -e TYPE=katalon \
+                -e REPORT_PATH= \
+                katalonstudio/report-uploader:0.0.8
+            displayName: Upload report to Katalon TestOps
+            env:
+              KATALON_API_KEY: e0e98d25-cf12-4571-963e-172e7b74a861
